@@ -2,39 +2,43 @@ import React, { useEffect, useState } from "react";
 import Form from "react-bootstrap/Form";
 import { socket } from "../../../config/socket";
 import Notification from "../../utils/messages/Notification";
+import { useNavigate } from "react-router";
 
 const Login = () => {
   const [login, setLogin] = useState({
     email: "",
     password: "",
   });
-
   const [response, setResponse] = useState("");
   const [message, setMessage] = useState("");
   const [visible, setVisible] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     function onResponse(data) {
       const { response, message } = data;
-      setResponse(response);
-      setMessage(message);
-      setVisible(true);
-      setTimeout(() => {
-        setVisible(false);
-      }, 3000);
+      if (response === "Success") {
+        navigate("/auctions");
+      } else {
+        setResponse(response);
+        setMessage(message);
+        setVisible(true);
+        setTimeout(() => {
+          setVisible(false);
+        }, 3000);
+      }
     }
     socket.on("Login response", (data) => onResponse(data));
     return () => {
       socket.off("Login response", (data) => onResponse(data));
     };
-  }, [visible, response, message]);
+  }, [visible, response, message, navigate]);
 
   const handleChange = (e) => {
     setLogin({
       ...login,
       [e.target.name]: e.target.value,
     });
-    console.log(login);
   };
 
   const handleSubmit = (e) => {

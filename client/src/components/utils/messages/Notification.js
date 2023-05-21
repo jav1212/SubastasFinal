@@ -1,5 +1,5 @@
 import React from "react";
-import { IoMdCheckmark, IoMdClose, IoMdWarning } from "react-icons/io";
+import { IoMdClose, IoMdWarning } from "react-icons/io";
 
 const Notification = ({ response, visible, message }) => {
   return (

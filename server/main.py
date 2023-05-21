@@ -8,6 +8,7 @@ from threading import Thread
 
 # Conectar a la base de datos MySQL
 import mysql.connector
+import json
 mydb = mysql.connector.connect(
     host="localhost",
     user="root",
@@ -16,7 +17,7 @@ mydb = mysql.connector.connect(
 )
 
 # Crear un cursor para ejecutar consultas
-mycursor = mydb.cursor()
+mycursor = mydb.cursor(buffered=True)
 
 # Flask server creation
 app = Flask(__name__)
@@ -40,10 +41,34 @@ max_users = 4
 # Función para manejar la conexión de un usuario
 
 
-def handle_user_session(sid):
+def getProductsFromDatabase(socket):
+    mycursor.execute("select * from productos")
+    resultados = mycursor.fetchall()
+
+    if resultados:
+        # Iterar sobre los resultados
+        data = []
+        for resultado in resultados:
+            id, nombre, descripcion, precio, src, marca, modelo, year = resultado
+            data.append({
+                'id': str(id),
+                'nombre': str(nombre),
+                'descripcion': str(descripcion),
+                'precio': str(precio),
+                'src': str(src),
+                'marca': str(marca),
+                'modelo': str(modelo),
+                'year': str(year)
+            })
+        socket.emit('postProducts', data)
+
+
+def handle_client(sid, socket):
     while True:
-        message = input()
-        socketio.emit('message', {'data': message}, room=sid)
+        @socket_io.on('getProducts')
+        def getProducts():
+            thread = Thread(target=getProductsFromDatabase, args=(socket,))
+            thread.start()
 
 
 @socket_io.on('Login')
@@ -59,30 +84,30 @@ def login(data):
         socket_io.emit('Login response', {
                        'response': 'Failed', 'message': 'Email or Password wrong, please try again'})
     else:
-        socket_io.emit('Login response', {
-                       'response': 'Success', 'message': 'Login'})
+        global users
+        if (len(users) <= max_users):
+            users.append(request.sid)
+            socket_io.emit('Login response', {
+                'response': 'Success', 'message': 'Login'})
+            thread = Thread(target=handle_client,
+                            args=(request.sid, socket_io,))
+            thread.start()
 
 
-@socket_io.on('connect')
-def handle_connect():
+def logout():
+    # Eliminar al usuario de la lista de usuarios conectados
     global users
-    if (len(users) < max_users):
-        # Agregar al usuario a la lista de usuarios conectados
-        users.append(request.sid)
+    users.remove(request.sid)
 
-        # Iniciar un nuevo hilo para manejar la conexión del usuario
-        t = Thread(target=handle_user_session, args=(request.sid,))
-        t.start()
-    else:
-        socket_io.emit('Login response', {
-                       'response': 'Preventive', 'message': 'The server is full, please try later'})
+
+@socket_io.on('logout')
+def handle_disconnect():
+    logout()
 
 
 @socket_io.on('disconnect')
 def handle_disconnect():
-    # Eliminar al usuario de la lista de usuarios conectados
-    global users
-    users.remove(request.sid)
+    logout()
 
 
 if __name__ == "__main__":
